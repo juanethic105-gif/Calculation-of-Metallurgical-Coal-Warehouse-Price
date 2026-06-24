@@ -159,15 +159,21 @@ st.markdown("""
 """)
 
 # 侧边栏精简为规则查阅面板
-st.sidebar.header("📋 山西基准库交割风控基准")
+st.sidebar.header("📋 山西基准库交割基准")
 st.sidebar.markdown("""
 * **地点升贴水**: 0 元/吨 (山西全境固定为基准库)
 * **港杂及物流费**: 0 元/吨 (由于在山西本地设库交割)
-* **灰分红线**: $\le 11.0\%$ (超标直接熔断)
-* **硫分红线**: $\le 1.60\%$ (超标直接熔断)
-* **挥发分红线**: $16.0\% \sim 28.0\%$
-* **CSR底线**: $\ge 60\%$
 """)
+st.sidebar.markdown("- **灰分 Ad**: 基准 10.5% ; 【≤10.0% 升价30; 10.5%-11.0% 扣价30】")
+st.sidebar.markdown("- **硫分 Std**: 基准 1.3% ; 【(1.3-1.6]% 每升高0.01%扣5元; [0.7-1.3]% 每降低0.01%升价2.5元; <0.7% 不额外升水，按0.7%档位封顶升价】")
+st.sidebar.markdown("- **挥发分 Vdaf**: 基准 [16.0%, 26.0%] ; 【(26.0%, 28.0%] 扣价50】")
+st.sidebar.markdown("- **GR.I (黏结指数)**: 基准 入库≥75，出库>65，无升贴水")
+st.sidebar.markdown("- **Y (胶质层最大厚度)**: 基准 10mm；【>10mm，无升贴水】")
+st.sidebar.markdown("- **CSR (反应后强度)**: 基准 [60%, 65%) ; ≥65% 升价80")
+st.sidebar.markdown("- **水分 Mt**: 基准 8.0%, 超过8.0%进行扣重折算: `(1 - 0.08) / (1 - 水分实测值)`")
+st.sidebar.markdown("- **镜质体随机反射率标准差**: 基准 0.13")
+st.sidebar.markdown("- **镜质体最大反射率**: 基准 （1.0, 1.7），占比≥70%")
+
 
 st.subheader("📥 批量现货竞拍文本一键多行输入")
 bulk_input = st.text_area(
@@ -243,7 +249,7 @@ if bulk_input.strip():
     # 📊 全局宏观决策看板
     # ==========================================
     if len(valid_warehouse_costs) > 0:
-        st.header("📊 本批次精煤竞拍全局决策看板")
+        st.header("📊 本批次竞拍结果汇总")
         avg_total = sum(valid_warehouse_costs) / len(valid_warehouse_costs)
         min_total = min(valid_warehouse_costs)
         
@@ -251,7 +257,7 @@ if bulk_input.strip():
         with col_m1:
             st.metric(label="平均仓单成本", value=f"{round(avg_total)} 元/吨")
         with col_m2:
-            st.metric(label="最低仓单成本", value=f"{round(min_total)} 元/吨", delta="最具套利价格边界", delta_color="inverse")
+            st.metric(label="最低仓单成本", value=f"{round(min_total)} 元/吨")
         with col_m3:
             st.metric(label="参与汇总的合格精煤总标的数", value=f"{len(valid_warehouse_costs)} 个")
 else:
