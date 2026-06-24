@@ -112,7 +112,7 @@ with col_in:
     
     if input_type == "原煤":
         rec_val = parsed_data['回收率'] if parsed_data['回收率'] else 90
-        input_rec_str = st.text_input("5. 原煤回收率 (%) (原煤**:red[必填]**)", value=str(rec_val))
+        input_rec_str = st.text_input("5. 原煤回收率 (%) (原煤必填)", value=str(rec_val))
         try:
             input_rec = float(input_rec_str)
         except ValueError:
