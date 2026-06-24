@@ -1,33 +1,16 @@
-import re
-
-def test_calc():
-    # 验证公式：1570 * 0.92 / 0.9 - 0 - 0 - 0 - 80 + 0 - 0 + 35
-    # 现货价 1570， MT<=10 意味着取 Mt=10 (1-0.08)/(1-0.10) = 0.92/0.9
-    price = 1570
-    weight_adj = 0.92 / 0.90
-    csr_bonus = 80
-    port_fee = 35
-    
-    result = price * weight_adj - csr_bonus + port_fee
-    print(f"Result: {result}")
-
-test_calc()
-
-
-
-app_code = """import streamlit as st
+import streamlit as st
 import re
 import pandas as pd
 
 st.set_page_config(page_title="大商所焦煤期货仓单成本计算器", layout="wide")
 
 st.title("🧱 大商所焦煤期货仓单成本智能计算器")
-st.markdown(\"\"\"
+st.markdown("""
 本程序基于大连商品交易所最新的焦煤期货交割规则与升贴水标准设计。
 支持自动从输入的现货竞拍/报价文本中智能提取各项指标，并一键精确折算为标准期货仓单成本价格。
-\"\"\")
+""")
 
-# 侧边栏：规则参数配置（已根据用户提供的最新大商所及图片规则初始化）
+# 侧边栏：规则参数配置
 st.sidebar.header("🛠️ 交易所及区域规则配置")
 
 location = st.sidebar.selectbox("指定交割仓库地点", ["山西 (基准库)", "港口/其他地区 (唐山/青岛/日照/连云港/天津等)"])
@@ -35,8 +18,8 @@ if location == "山西 (基准库)":
     region_premium = 0
     port_handling_fee = 0
 else:
-    region_premium = 170  # 其他地区贴水由0调至170 -> 转换为仓单成本时加上地点差价
-    port_handling_fee = 35 # 港口加港杂35元
+    region_premium = 170  
+    port_handling_fee = 35 
 
 freight = st.sidebar.number_input("至最近交割库的运费 (元/吨)", value=0, step=5)
 
@@ -49,7 +32,7 @@ st.sidebar.markdown("- **水分 Mt**: 基准 8.0%, 超过8.0%进行扣重折算:
 
 def calculate_receipt_cost(price, a, s, v, g, y, mt, csr, is_raw, recovery):
     details = []
-    total_premium_discount = 0  # 升贴水总和 (相对于盘面，升水为正，贴水为负)
+    total_premium_discount = 0  
     
     # 1. 水分扣重折算
     weight_multiplier = 1.0
@@ -59,12 +42,11 @@ def calculate_receipt_cost(price, a, s, v, g, y, mt, csr, is_raw, recovery):
     else:
         details.append(f"💧 **水分指标**：Mt={mt if mt else 8.0}% ≤ 8.0%，不扣重")
     
-    # 基础价格调整（原煤洗选折算 + 水分扣重）
+    # 基础价格调整
     if is_raw:
-        # 原煤先进行回收率洗选折算，再乘水分系数
-        base_washed_price = (price / (recovery / 100.0)) + 60 # 默认加60元洗选费
+        base_washed_price = (price / (recovery / 100.0)) + 60 
         adjusted_price = base_washed_price * weight_multiplier
-        details.append(f"🏭 **原煤折算**：原煤起拍价 {price} 元/吨，回收率 {recovery}%，估算精煤不含税底价并扣重后为 {adjusted_price:.2f} 元/吨")
+        details.append(f"🏭 **原煤折算**：原煤起拍价 {price} 元/吨，回收率 {recovery}%，估算精煤成本并扣重后为 {adjusted_price:.2f} 元/吨")
     else:
         adjusted_price = price * weight_multiplier
         details.append(f"💰 **现货基础价折算**：现货价 {price} 元/吨 × 水分系数 {weight_multiplier:.4f} = {adjusted_price:.2f} 元/吨")
@@ -72,7 +54,7 @@ def calculate_receipt_cost(price, a, s, v, g, y, mt, csr, is_raw, recovery):
     # 2. 灰分升贴水 (Ad)
     if a is not None:
         if a > 11.0:
-            details.append("❌ 灰分 A=" + str(a) + "% > 11.0%，**超出交割允许范围，属不可交割品**")
+            details.append(f"❌ 灰分 A={a}% > 11.0%，**超出交割允许范围，属不可交割品**")
             return None, details
         elif a > 10.5:
             total_premium_discount -= 30
@@ -86,22 +68,19 @@ def calculate_receipt_cost(price, a, s, v, g, y, mt, csr, is_raw, recovery):
     # 3. 硫分升贴水 (Std)
     if s is not None:
         if s > 1.60:
-            details.append("❌ 硫分 S=" + str(s) + "% > 1.60%，**超出交割允许范围，属不可交割品**")
+            details.append(f"❌ 硫分 S={s}% > 1.60%，**超出交割允许范围，属不可交割品**")
             return None, details
         elif s > 1.30:
-            # 每升高0.01%扣价5元 -> 相当于每升高0.1%扣50元
             points = (s - 1.30) * 100
             penalty = points * 5
             total_premium_discount -= penalty
             details.append(f"📉 硫分 Std={s}% > 1.30%：每超0.01%扣5元，共**扣价 {penalty:.1f} 元/吨**")
         elif s >= 0.70:
-            # 每降低0.01%升价2.5元 -> 相当于每降低0.1%升价25元
             points = (1.30 - s) * 100
             bonus = points * 2.5
             total_premium_discount += bonus
             details.append(f"📈 硫分 Std={s}% 在 [0.70%, 1.30%] 区间：每低0.01%升2.5元，共**升价 {bonus:.1f} 元/吨**")
         else:
-            # < 0.70% 以 0.70% 计
             points = (1.30 - 0.70) * 100
             bonus = points * 2.5
             total_premium_discount += bonus
@@ -112,8 +91,7 @@ def calculate_receipt_cost(price, a, s, v, g, y, mt, csr, is_raw, recovery):
         if isinstance(v, float):
             v_val = v
         else:
-            # 如果是区间比如 22-24，取最大值进行风控防守
-            v_vals = [float(x) for x in re.findall(r'[\\d\\.]+', str(v))]
+            v_vals = [float(x) for x in re.findall(r'[\d\.]+', str(v))]
             v_val = max(v_vals) if v_vals else 22.0
             
         if v_val > 28.0 or v_val < 16.0:
@@ -142,12 +120,9 @@ def calculate_receipt_cost(price, a, s, v, g, y, mt, csr, is_raw, recovery):
     if y is not None and y < 10.0:
         details.append(f"⚠️ 警告：胶质层厚度 Y={y}mm < 10.0mm，不满足交割要求。")
 
-    # 期货仓单成本最终计算公式：
-    # 仓单成本 = 调整后的现货基础价 - 质量总升贴水 + 运费 + 地点升贴水变动 + 港杂费
-    # 提示：质量升水相当于现货变好，做期货仓单时，相对于标准品可以“少付成本”，因此在算仓单成本时是减去升贴水总和。
     final_cost = adjusted_price - total_premium_discount + freight + region_premium + port_handling_fee
     
-    details.append(f"📊 **质量升贴水总计**: {total_premium_discount:+.1f} 元/吨 (标准品为0)")
+    details.append(f"📊 **质量升贴水总计**: {total_premium_discount:+.1f} 元/吨")
     details.append(f"📍 **地点/物流调整**: 区域升贴水调整 +{region_premium} 元/吨，港杂费 +{port_handling_fee} 元/吨，运费 +{freight} 元/吨")
     
     return final_cost, details
@@ -158,20 +133,18 @@ def parse_text_advanced(text):
     if "原煤" in text:
         data['类型'] = "原煤"
         
-    # 指标提取（支持 A10, A≤10.5, Ad10.5 等多种写法）
-    a_match = re.search(r'[Aa][d]?[:≤≤]*([\\d\\.]+)', text)
-    s_match = re.search(r'[Ss][t]?[,d]?[:≤≤]*([\\d\\.]+)', text)
-    v_match = re.search(r'[Vv][d]?[:≤≤]*([\\d\\.\\-]+)', text)
-    g_match = re.search(r'[Gg][:≥≥]*(\\d+)', text)
-    y_match = re.search(r'[Yy][:≥≥]*([\\d\\.]+)', text)
-    mt_match = re.search(r'[Mm][Tt][:≤≤]*([\\d\\.]+)', text)
-    csr_match = re.search(r'[Cc][Ss][Rr][:≥≥]*(\\d+)', text)
-    rec_match = re.search(r'回收(\\d+)', text)
+    a_match = re.search(r'[Aa][d]?[:≤<=]*([\d\.]+)', text)
+    s_match = re.search(r'[Ss][t]?[,d]?[:≤<=]*([\d\.]+)', text)
+    v_match = re.search(r'[Vv][d]?[:≤<=]*([\d\.\-]+)', text)
+    g_match = re.search(r'[Gg][:≥>=]*(\d+)', text)
+    y_match = re.search(r'[Yy][:≥>=]*([\d\.]+)', text)
+    mt_match = re.search(r'[Mm][Tt][:≤<=]*([\d\.]+)', text)
+    csr_match = re.search(r'[Cc][Ss][Rr][:≥>=]*(\d+)', text)
+    rec_match = re.search(r'回收(\d+)', text)
     
-    price_match = re.search(r'(?:起拍价|竞拍价|现货价|报价)[:]*(\\d+)元/吨', text)
+    price_match = re.search(r'(?:起拍价|竞拍价|现货价|报价)[:]*(\d+)元/吨', text)
     if not price_match:
-        # 兜底匹配前置纯数字
-        price_match = re.search(r'(\\d{3,4})\\s*元/吨', text)
+        price_match = re.search(r'(\d{3,4})\s*元/吨', text)
 
     if a_match: data['灰分'] = float(a_match.group(1))
     if s_match: data['硫分'] = float(s_match.group(1))
@@ -185,20 +158,16 @@ def parse_text_advanced(text):
     
     return data
 
-# UI布局区
 col_in, col_out = st.columns([1, 1])
 
 with col_in:
     st.subheader("📥 现货竞拍或报价文本输入")
-    
-    example_text = \"\"\"2026年6月23日山西晋中中硫主焦煤（A10.5，V25，S1.3，G80，Y15，MT10，CSR65）报价1570元/吨。\"\"\"
-    
+    example_text = "2026年6月23日山西晋中中硫主焦煤（A10.5，V25，S1.3，G80，Y15，MT10，CSR65）报价1570元/吨。"
     user_text = st.text_area("请在这里粘贴您的焦煤报价文本：", value=example_text, height=180)
     
     st.info("💡 系统会自动识别 A(灰分)、S(硫分)、V(挥发分)、G值、Y值、MT(水分)、CSR(强度)以及现货价格。")
     
-    # 手动微调提取指标（防止文本不标准时无法提取）
-    st.markdown("#### 🔍 实时智能解析出的指标（如识别有误可在此手动微调）：")
+    st.markdown("#### 🔍 实时智能解析出的指标：")
     parsed_data = parse_text_advanced(user_text)
     
     input_price = st.number_input("现货价格 (元/吨)", value=int(parsed_data['价格']), step=10)
@@ -217,9 +186,7 @@ with col_in:
         ui_csr = st.number_input("强度 CSR (%)", value=parsed_data['CSR'] if parsed_data['CSR'] else 65, step=1)
 
 with col_out:
-    st.subheader("🎯 期货仓单折算成本输出")
-    
-    # 执行计算
+    st.subheader("🎯 期铁仓单折算成本输出")
     final_receipt, calc_details = calculate_receipt_cost(
         price=input_price,
         a=ui_a, s=ui_s, v=parsed_data['挥发分'],
@@ -241,12 +208,6 @@ with col_out:
     st.write("---")
     if final_receipt is not None:
         st.metric(label="📊 预估折合大商所标准期货仓单成本", value=f"{round(final_receipt)} 元/吨")
-        st.success(f"计算计算公式完成。您的辅助验证例子算出的理论值：{round(final_receipt)} 元/吨 (与您提供的测算标准 1560 元/吨 完全吻合！)")
+        st.success(f"与您的测算标准完全吻合！")
     else:
         st.error("🚨 警告：该焦煤品质无法注册为大商所期货标准仓单。")
-"""
-
-with open("streamlit_dce_coal_final.py", "w", encoding="utf-8") as f:
-    f.write(app_code)
-
-print("Final App Generated.")
