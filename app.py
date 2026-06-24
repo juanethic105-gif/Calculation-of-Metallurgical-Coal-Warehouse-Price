@@ -111,10 +111,10 @@ with col_in:
     input_type = st.selectbox("4. 煤种类型 **:red[必填]**", ["请选择...", "精煤/焦煤", "原煤"], index=2 if parsed_data['类型']=="原煤" else 0)
     
     if input_type == "原煤":
-        rec_val = parsed_data['回收率'] if parsed_data['回收率'] else ""
-        input_rec_str = st.text_input("5. 原煤回收率 (%) (原煤**:red[必填]**)", value=str(rec_val) if rec_val else "")
+        rec_val = parsed_data['回收率'] if parsed_data['回收率'] else 90
+        input_rec_str = st.text_input("5. 原煤回收率 (%) (原煤**:red[必填]**)", value=str(rec_val))
         try:
-            input_rec = float(input_rec_str) if input_rec_str else None
+            input_rec = float(input_rec_str)
         except ValueError:
             input_rec = None
     else:
